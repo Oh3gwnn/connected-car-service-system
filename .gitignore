@@ -1,0 +1,21 @@
+# 1. 가상환경
+.venv/
+venv/
+ENV/
+
+# 2. 파이썬 실행 캐시 파일
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# 3. 맥북 시스템 파일
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 4. etc
+.vscode/
+.env
+*.local

@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  # 1. MQTT Broker
+  mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: ccs-mqtt-broker
+    ports:
+      - "1883:1883"  # 기본 MQTT 통신 포트 (차량 단말용)
+      - "9001:9001"  # WebSockets over MQTT (웹 화면 알림용)
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: always

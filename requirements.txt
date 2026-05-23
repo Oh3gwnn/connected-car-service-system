@@ -1,0 +1,10 @@
+fastapi             # 메인 API 서버 웹 프레임워크
+uvicorn[standard]   # FastAPI 서버를 구동시켜 주는 비동기 엔진
+paho-mqtt           # 차량 단말과 통신할 때 쓰는 MQTT 클라이언트 라이브러리
+aiokafka            # 비동기 방식의 Kafka 클라이언트
+pytest              # E2E 자동화 검증과 테스트용 프레임워크
+playwright
+
+httpx               # FastAPI 서버가 외부 통신을 하거나 모바일과 연동할 때 쓸 비동기 HTTP 라이브러리
+python-can          # 리눅스 가상 CAN(vcan) 버스에 메시지를 쏘고 받기 위한 도구
+cantools            # .dbc 파일을 파이썬으로 읽고 CAN 메시지를 해석해주는 도구
