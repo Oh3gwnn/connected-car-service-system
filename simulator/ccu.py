@@ -13,8 +13,17 @@ DEFAULT_MQTT_HOST = "mqtt" if IS_CONTAINER else "127.0.0.1"
 MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", DEFAULT_MQTT_HOST)
 MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", 1883))
 
-# macOS/로컬 환경에서 호스트명 확인 이슈를 방지하기 위해 서버 피드백 주소를 127.0.0.1로 고정합니다.
+# 로컬 피드백 채널 주소
 TELEMATICS_SERVER_URL = "http://127.0.0.1:8000/api/v1/telematics/status"
+
+# 🌟 [피드백 완벽 반영] 차량의 물리 상태를 기억하는 실시간 로컬 레지스터
+# (Change-only 감지를 통하여 중복 요청 시 VSS 동기화를 지능적으로 필터링)
+CURRENT_STATE = {
+    "ign_state": 0,          # 0: PANEL_OFF, 1: ACC, 2: IGN_ON, 3: KEY_START
+    "lock": 1,               # 0: UNLOCKED, 1: LOCKED
+    "climate_active": 0,     # 0: OFF, 1: ACTIVE
+    "target_temp": 22.0
+}
 
 # -----------------------------------------------------------------------------
 # [OS 감지 및 python-can 버스 어댑터 설정]
@@ -24,7 +33,7 @@ try:
     import can
     CAN_SUPPORTED = True
 except ImportError:
-    print("⚠️  [CCU] 'python-can' 라이브러리가 없어 시뮬레이션 로그 출력 모드로 작동합니다.")
+    print("⚠️  [CCU] 'python-can' 라이브러리가 없어 가상 시뮬레이션 모드로 작동합니다.")
 
 def init_can_interface():
     if not CAN_SUPPORTED:
@@ -74,47 +83,90 @@ def on_message(client, userdata, msg):
         command = data.get("command")
         temperature = data.get("temperature")
 
-        # 1차 로컬 데이터 유효성 검증 및 전압 가드 모사
+        # 1차 로컬 데이터 유효성 검증
         if not command:
-            report_back_to_server(tx_id, vin, 8001, "단말 데이터 암호/해독 실패")
+            report_back_to_server(tx_id, vin, 7000, "7000: 단말 데이터 규격 해독 실패")
             return
 
-        # 차량 로컬 온도 제한 정책 적용 (B-CAN 전송 전 차단)
+        # 차량 로컬 온도 제한 정책 적용 -> 7000 에러 코드로 통일
         if "CLIMATE" in command and temperature is not None:
             if not (16.0 <= temperature <= 30.0):
                 print(f"❌ [CCU 검증] 비정상 범위 공조 요구 에러 ({temperature}°C)")
-                # CAN 전송을 전면 취소하고, 서버에 독자 에러코드 '7930' 송부
-                report_back_to_server(tx_id, vin, 7930, f"CAN 송신 불가: 온도 에러 ({temperature}°C)")
+                report_back_to_server(tx_id, vin, 7000, f"7000: B-CAN 송출 거부 - 한계 온도 초과 ({temperature}°C)")
                 return
+
+        # 🌟 [피드백 반영] 이진 상태 감지 로직 가동
+        # 이전 상태와 대조하여 실제 변동 여부를 판별합니다.
+        has_changed = False
+        if "RDO_UNLOCK" in command:
+            if CURRENT_STATE["lock"] != 0:
+                CURRENT_STATE["lock"] = 0
+                has_changed = True
+        elif "RDO_LOCK" in command:
+            if CURRENT_STATE["lock"] != 1:
+                CURRENT_STATE["lock"] = 1
+                has_changed = True
+        elif "CLIMATE" in command:
+            if CURRENT_STATE["ign_state"] != 3 or CURRENT_STATE["climate_active"] != 1 or (temperature is not None and CURRENT_STATE["target_temp"] != temperature):
+                CURRENT_STATE["ign_state"] = 3
+                CURRENT_STATE["climate_active"] = 1
+                if temperature is not None:
+                    CURRENT_STATE["target_temp"] = temperature
+                has_changed = True
+        elif "ENGINE" in command:
+            if CURRENT_STATE["ign_state"] != 3:
+                CURRENT_STATE["ign_state"] = 3
+                has_changed = True
 
         # 무선 ➡️ 유선 CAN 프레임 변환 송출
         success = transmit_can_signal(command, temperature)
         
-        # 정상 통과 시 텔레매틱스 서버에 완료 패킷 및 알림 트리거용 POST 전송
         if success:
-            code = 2040 if "LOCK" in command else 2041 if "UNLOCK" in command else 2000
-            msg_text = "문 잠김이 해제되었습니다" if "UNLOCK" in command else "도어가 잠겼습니다" if "LOCK" in command else f"공조기 {temperature}도 작동 완료"
-            report_back_to_server(tx_id, vin, code, msg_text)
+            # 🌟 [핵심 변경사항] 상태가 실제 변동된 경우에만 VSS Status Sync (204)를 선제 보고합니다!
+            if has_changed:
+                print("🔄 [CCU ➔ VSS] 차량 정보 변동 감지! VSS 동기화 패킷 전송을 트리거합니다.")
+                vss_msg = "VSS Sync: "
+                if "UNLOCK" in command:
+                    vss_msg += "RDO lock=0 (UNLOCKED)"
+                elif "LOCK" in command:
+                    vss_msg += "RDO lock=1 (LOCKED)"
+                elif "CLIMATE" in command:
+                    vss_msg += f"RSC ign=3, climate_active=1, temp={temperature}°C"
+                elif "ENGINE" in command:
+                    vss_msg += "RSC ign=3 (KEY_START)"
+                
+                report_back_to_server(tx_id, vin, 204, vss_msg)
+            else:
+                print("ℹ️ [CCU ➔ VSS] 차량 정보 변동 없음 (0 ➔ 0 / 1 ➔ 1). VSS 동기화 생략.")
+
+            # 🌟 MT-MO 트랜잭션의 최종 완성은 항상 200 (MRC_SUCCESS)으로 마감
+            mrc_msg = "RDO 문 제어 성공" if "RDO" in command else f"RSC 원격 제어 {temperature if temperature else ''}°C 완료"
+            report_back_to_server(tx_id, vin, 200, mrc_msg)
+        else:
+            report_back_to_server(tx_id, vin, 7000, "7000: 유선 내부 CAN 버스 송출 실패")
 
     except json.JSONDecodeError:
         print("❌ [CCU] JSON 포맷 해석 실패")
+        report_back_to_server(tx_id, vin, 7000, "7000: 패킷 해석 실패 (JSON syntax)")
     except Exception as e:
         print(f"❌ [CCU] 장치 가드 에러: {str(e)}")
+        report_back_to_server(tx_id, vin, 7000, f"7000: 시스템 장치 에러: {str(e)}")
 
 def transmit_can_signal(command, temperature):
     can_id = 0x123
     data_bytes = [0x00] * 8
     data_bytes[0] = 0x01
 
-    if command in ["START_CLIMATE", "START_ENGINE"]:
+    if "CLIMATE" in command or "ENGINE" in command:
         data_bytes[1] = 0x01
         if temperature is not None:
             data_bytes[2] = int(temperature * 2)
-    elif command == "STOP_CLIMATE":
-        data_bytes[1] = 0x02
-    elif command in ["LOCK_DOOR", "UNLOCK_DOOR"]:
+    elif "LOCK" in command:
         can_id = 0x201
-        data_bytes[1] = 0x03 if "LOCK" in command else 0x04
+        data_bytes[1] = 0x03
+    elif "UNLOCK" in command:
+        can_id = 0x201
+        data_bytes[1] = 0x04
 
     print(f"⚡ [CCU -> B-CAN] 패킷 인코딩 완료 (ID: {hex(can_id)}, Payload: {[hex(x) for x in data_bytes]})")
 
@@ -128,11 +180,10 @@ def transmit_can_signal(command, temperature):
             print(f"❌ [CCU -> CAN] 물리 에러: {str(e)}")
             return False
     else:
-        print("💻 [CCU (가상 모드)] 시뮬레이터가 유효하게 작동했습니다.")
+        print("💻 [CCU (가상 모드)] 가상 시뮬레이터 인터페이스 정상 출력 완료.")
         return True
 
 def report_back_to_server(tx_id, vin, status_code, message):
-    """차량 단말기(CCU)가 셀룰러 망을 타고 서버로 최종 제어 결과를 통보(MO Return)하는 함수"""
     print(f"📡 [CCU -> Server 통보] 트랜잭션: {tx_id} | 코드: {status_code} | 결과: {message}")
     try:
         payload = {

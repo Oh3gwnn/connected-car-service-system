@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* 커스텀 스크롤바 디자인 (어두운 실무 톤) */
+        /* 커스텀 스크롤바 디자인 */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -28,51 +28,66 @@
     <!-- 최상단 글로벌 헤더 -->
     <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex justify-between items-center shadow-md">
         <div class="flex items-center space-x-3">
-            <i class="fa-solid fa-server text-emerald-400 text-lg"></i>
-            <h1 class="text-base font-bold tracking-wider text-slate-200">TMS (Telematics Monitoring System) <span class="text-xs text-slate-500 font-normal">| Ver 2.0</span></h1>
+            <i class="fa-solid fa-microchip text-teal-400 text-lg"></i>
+            <h1 class="text-base font-bold tracking-wider text-slate-200">TMS (Telematics Monitoring System) <span class="text-xs text-slate-500 font-normal">| Ver 2.2</span></h1>
         </div>
         <div class="flex space-x-4 items-center text-xs">
-            <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded flex items-center">
+            <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded flex items-center font-bold">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-ping"></span>
-                CAN/CELLULAR BUS ONLINE
+                CAN & WIRE BUS ACTIVE
             </span>
-            <span class="text-slate-500">SYS_PORT: 8000</span>
+            <span class="text-slate-500">PORT: 8000</span>
         </div>
     </header>
 
-    <!-- 실무용 콤팩트 ECU REGISTER STATUS BAR (헤더 바로 아래 한 줄로 압축) -->
+    <!-- 하드웨어 와이어 및 전원 레지스터 콤팩트 상태 바 -->
     <div class="bg-slate-900/40 border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs text-slate-400 gap-4">
-        <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-5 flex-wrap gap-y-1.5">
             <div>
-                <span class="text-slate-500 font-bold">[SYS_INFO]</span>
-                <span id="reg-car-model" class="text-slate-300 ml-1.5">-</span>
+                <span class="text-slate-500 font-bold">[MODEL]</span>
+                <span id="reg-car-model" class="text-slate-300 ml-1.5 font-bold">-</span>
             </div>
-            <div class="h-3 w-[1px] bg-slate-800"></div>
+            <div class="h-3 w-[1px] bg-slate-800 hidden sm:block"></div>
+            
+            <!-- VSS IGN STATE 출력 -->
             <div>
-                <span class="text-slate-500 font-bold">ENG_STAT:</span>
-                <span id="reg-engine" class="font-bold text-slate-400 ml-1.5">0 (STANDBY)</span>
+                <span class="text-slate-500 font-bold">VSS_IGN_STATE:</span>
+                <span id="reg-engine" class="font-bold text-slate-300 ml-1.5">0 (PANEL_OFF)</span>
             </div>
-            <div class="h-3 w-[1px] bg-slate-800"></div>
+            <div class="h-3 w-[1px] bg-slate-800 hidden sm:block"></div>
+            
+            <!-- 배선 와이어 릴레이 전압 상태 출력 -->
+            <div class="flex items-center space-x-3 bg-slate-950 px-2.5 py-1 rounded border border-slate-800/80 font-bold">
+                <span class="text-slate-500 font-bold text-[10px] uppercase">Wires:</span>
+                <span class="flex items-center gap-1">b1:<span id="wire-b1" class="text-emerald-400 font-mono">1</span></span>
+                <span class="text-slate-800">|</span>
+                <span class="flex items-center gap-1">acc:<span id="wire-acc" class="text-slate-500 font-mono">0</span></span>
+                <span class="text-slate-800">|</span>
+                <span class="flex items-center gap-1">ign1:<span id="wire-ign1" class="text-slate-500 font-mono">0</span></span>
+            </div>
+            <div class="h-3 w-[1px] bg-slate-800 hidden sm:block"></div>
+
             <div>
                 <span class="text-slate-500 font-bold">RDO_LOCK:</span>
-                <span id="reg-door" class="font-bold text-slate-400 ml-1.5">1 (LOCKED)</span>
+                <span id="reg-door" class="font-bold text-slate-300 ml-1.5">1 (LOCKED)</span>
             </div>
-            <div class="h-3 w-[1px] bg-slate-800"></div>
+            <div class="h-3 w-[1px] bg-slate-800 hidden sm:block"></div>
             <div>
                 <span class="text-slate-500 font-bold">CLIM_TEMP:</span>
-                <span id="reg-temp" class="font-bold text-slate-400 ml-1.5">OFF</span>
+                <span id="reg-temp" class="font-bold text-slate-300 ml-1.5">OFF</span>
             </div>
         </div>
-        <div class="flex items-center space-x-2">
-            <span class="text-slate-500 font-bold">TERMINAL_STREAM:</span>
-            <span id="reg-tx-id" class="text-slate-500 font-mono text-[11px]">-</span>
+        <div class="flex items-center space-x-2 text-[11px]">
+            <span class="text-slate-500 font-bold">STREAM:</span>
+            <span id="reg-tx-id" class="text-slate-500 font-mono">-</span>
         </div>
     </div>
 
-    <!-- 메인 레이아웃 (3열 대칭 분할 구조) -->
+    <!-- 메인 레이아웃 -->
     <main class="flex-1 flex overflow-hidden">
-        <!-- [1열] 트랜잭션 수집 리스트 (좌측 20%) -->
-        <section class="w-1/5 border-r border-slate-800 p-4 flex flex-col overflow-hidden bg-slate-900/10">
+        
+        <!-- [1열] Active Transactions 리스트 영역 -->
+        <section class="w-[28%] border-r border-slate-800 p-4 flex flex-col overflow-hidden bg-slate-900/10">
             <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center">
                 <i class="fa-solid fa-list-ul mr-2 text-indigo-400"></i> Active Transactions
             </h2>
@@ -81,137 +96,127 @@
             </div>
         </section>
 
-        <!-- [2열] 시퀀스 다이어그램 및 인스펙터 (중앙 45%) -->
-        <section class="w-[45%] p-5 flex flex-col overflow-hidden bg-slate-950/20 border-r border-slate-800 justify-between">
-            <div class="flex-1 flex flex-col overflow-hidden relative">
-                <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center">
-                    <i class="fa-solid fa-diagram-next mr-2 text-yellow-400"></i> UML Sequence Log
-                </h2>
+        <!-- [우측 통합 검증 작업 구역] -->
+        <div class="flex-1 flex flex-col p-4 gap-4 overflow-hidden bg-slate-950/20">
+            
+            <!-- [상부 행]: 가로로 긴 시퀀스 뷰어와 스텝 인스펙터 나란히 배치 -->
+            <div class="flex gap-4 h-56 min-h-[224px]">
                 
-                <div id="ladder-view" class="flex-1 border border-slate-800 rounded-lg bg-slate-950/90 p-4 relative flex flex-col hidden overflow-hidden">
-                    <!-- 4대 통신 기둥 헤더 (CSS Grid로 간격 미세 고정) -->
-                    <div class="grid grid-cols-4 text-center font-bold text-[10px] text-slate-400 border-b border-slate-800 pb-3 z-10">
+                <!-- [UML Sequence Log]: 가로로 길게 늘리고 세로를 단축한 사다리 그래프 -->
+                <div class="flex-1 border border-slate-800 rounded-lg bg-slate-950/90 p-4 relative flex flex-col overflow-hidden">
+                    <!-- 4대 통신 기둥 헤더 -->
+                    <div class="grid grid-cols-4 text-center font-bold text-[10px] text-slate-400 border-b border-slate-800 pb-2 z-10">
                         <div class="text-sky-400"><i class="fa-solid fa-mobile-screen mr-1"></i>APP</div>
                         <div class="text-indigo-400"><i class="fa-solid fa-server mr-1"></i>SERVER</div>
                         <div class="text-yellow-400"><i class="fa-solid fa-tower-broadcast mr-1"></i>CCU</div>
                         <div class="text-emerald-400"><i class="fa-solid fa-microchip mr-1"></i>ECU</div>
                     </div>
 
-                    <!-- 수직 기둥 선 레이어 (헤더 열 정중앙과 완벽 일치하도록 12.5% 간격 배분) -->
+                    <!-- 정교한 수직 가이드라인 점선 -->
                     <div class="absolute inset-y-0 left-0 w-full flex pointer-events-none px-4">
-                        <div class="absolute top-12 bottom-4 left-[12.5%] w-[1px] border-l border-dashed border-sky-500/20"></div>
-                        <div class="absolute top-12 bottom-4 left-[37.5%] w-[1px] border-l border-dashed border-indigo-500/20"></div>
-                        <div class="absolute top-12 bottom-4 left-[62.5%] w-[1px] border-l border-dashed border-yellow-500/20"></div>
-                        <div class="absolute top-12 bottom-4 left-[87.5%] w-[1px] border-l border-dashed border-emerald-500/20"></div>
+                        <div class="absolute top-10 bottom-3 left-[12.5%] w-[1px] border-l border-dashed border-sky-500/20"></div>
+                        <div class="absolute top-10 bottom-3 left-[37.5%] w-[1px] border-l border-dashed border-indigo-500/20"></div>
+                        <div class="absolute top-10 bottom-3 left-[62.5%] w-[1px] border-l border-dashed border-yellow-500/20"></div>
+                        <div class="absolute top-10 bottom-3 left-[87.5%] w-[1px] border-l border-dashed border-emerald-500/20"></div>
                     </div>
 
-                    <!-- 동적으로 채워질 시퀀스 화살표 컨테이너 -->
-                    <div id="sequence-steps-container" class="flex-1 overflow-y-auto pt-4 space-y-2.5 z-10 pr-1">
+                    <!-- 시퀀스 화살표 컨테이너 -->
+                    <div id="sequence-steps-container" class="flex-1 overflow-y-auto pt-3 space-y-2 z-10 pr-1">
                         <!-- 화살표 요소 동적 렌더링 -->
                     </div>
                 </div>
 
-                <div id="empty-ladder" class="flex-1 flex flex-col items-center justify-center border border-slate-800 border-dashed rounded-lg text-slate-600 space-y-2 bg-slate-950/40">
-                    <i class="fa-solid fa-code-compare text-3xl animate-pulse text-slate-700"></i>
-                    <p class="text-xs">트랜잭션을 선택하면 UML 그래프가 그려집니다.</p>
-                </div>
-            </div>
-
-            <!-- 디테일 분석기 (설명 영역을 대폭 줄여서 간소화) -->
-            <div class="h-28 border-t border-slate-800/80 pt-3 mt-3 flex flex-col justify-between">
-                <div class="bg-slate-900/30 border border-slate-800 p-2.5 rounded-lg flex-1 flex flex-col justify-between">
-                    <div class="flex justify-between items-center border-b border-slate-800 pb-1.5 mb-1.5">
-                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest"><i class="fa-solid fa-bolt text-teal-400"></i> Step Analysis</span>
-                        <span id="inspect-protocol" class="text-[9px] font-mono text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">PROT: -</span>
+                <!-- [Step Analysis]: 해설 분석기 -->
+                <div class="w-[32%] bg-slate-900/30 border border-slate-800 p-3.5 rounded-lg flex flex-col justify-between overflow-hidden h-full">
+                    <div class="overflow-hidden flex flex-col flex-1">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest"><i class="fa-solid fa-bolt text-teal-400 mr-1"></i> Step Analysis</span>
+                            <span id="inspect-protocol" class="text-[9px] font-mono text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">PROT: -</span>
+                        </div>
+                        <p id="inspect-summary" class="font-bold text-slate-200 text-xs mb-1.5 truncate font-sans">화살표를 선택하십시오.</p>
+                        <p id="inspect-desc" class="text-slate-400 text-[10px] leading-relaxed overflow-y-auto max-h-[110px] font-sans">
+                            다이어그램의 수평 흐름선을 마우스로 선택하면 차량 통신망에서 데이터가 유입된 물리 원인 및 세부 프로토콜 동작 원리를 즉시 확인할 수 있습니다.
+                        </p>
                     </div>
-                    <p id="inspect-summary" class="font-bold text-slate-200 text-xs mb-1">화살표를 선택하십시오.</p>
-                    <p id="inspect-desc" class="text-slate-500 text-[10px] leading-relaxed truncate">통신 화살표를 클릭하여 패킷 분석 로그를 로드합니다.</p>
                 </div>
-            </div>
-        </section>
 
-        <!-- [3열] Raw Packet 및 실시간 텔레매틱스 터미널 로그 (우측 35% - 피드백 반영 최적화) -->
-        <section class="w-[35%] p-4 flex flex-col gap-4 overflow-hidden bg-slate-900/5">
-            <!-- 1. 패킷 및 프로비저닝 데이터 분리 뷰어 (상부) -->
-            <div class="h-[45%] flex flex-col bg-slate-900/40 border border-slate-800 p-3 rounded-lg">
-                <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider"><i class="fa-solid fa-database text-indigo-400 mr-1.5"></i> Structured Packet DB</span>
-                    <button onclick="copyRawJson()" class="text-slate-500 hover:text-slate-300 text-[10px]"><i class="fa-regular fa-copy mr-1"></i>Copy</button>
-                </div>
-                <!-- 꼬임 없는 스크롤 및 모노 폰트 적용 -->
-                <pre id="inspect-json" class="flex-1 overflow-y-auto bg-slate-950 p-3 rounded text-[10px] text-emerald-400 leading-relaxed font-mono border border-slate-800 select-all">{}</pre>
             </div>
 
-            <!-- 2. 실시간 시스템/차량 하드웨어 터미널 로그 (하부) -->
-            <div class="h-[55%] flex flex-col bg-slate-900/40 border border-slate-800 p-3 rounded-lg">
-                <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-terminal text-emerald-400 mr-2"></i> Cellular & CAN Terminal Log</span>
-                    <span class="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">STREAMING</span>
+            <!-- [하부 행]: 전체 가로폭을 채우는 대형 Structured Packet DB -->
+            <div class="flex-1 flex flex-col bg-slate-900/40 border border-slate-800 p-4 rounded-lg overflow-hidden">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-2.5">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider"><i class="fa-solid fa-database text-indigo-400 mr-1.5"></i> Structured Packet DB (Raw JSON Format)</span>
+                    <button onclick="copyRawJson()" class="text-slate-500 hover:text-slate-200 text-xs flex items-center gap-1 transition-colors"><i class="fa-regular fa-copy"></i> Copy JSON</button>
                 </div>
-                <div id="terminal-log" class="flex-1 overflow-y-auto bg-slate-950 p-3 rounded text-[10px] text-slate-300 leading-relaxed font-mono border border-slate-800 space-y-1.5">
-                    <div class="text-slate-600">[SYSTEM] Terminal initialized. Waiting for telematics packets...</div>
-                </div>
+                <pre id="inspect-json" class="flex-1 overflow-y-auto bg-slate-950 p-4 rounded-xl text-xs text-emerald-400 leading-relaxed font-mono border border-slate-800 select-all shadow-inner">{}</pre>
             </div>
-        </section>
+
+        </div>
+
     </main>
 
     <!-- 실시간 스크립트 엔진 -->
     <script>
         const STEP_EXPLANATIONS = {
-            'MRC-A START_CLIMATE REQUEST': {
+            'MRC-A RSC_START_CLIMATE REQUEST': {
                 protocol: 'HTTP/1.1 (POST)',
                 summary: '1. App ➔ Server: 원격 공조 구동 제어 요청 인입',
                 desc: 'App으로부터 원격 제어 요청 바인딩 완료. target_temperature 신호 조립.'
             },
-            'MRC-A RDO REQUEST': {
+            'MRC-A RDO_LOCK REQUEST': {
                 protocol: 'HTTP/1.1 (POST)',
-                summary: '1. App ➔ Server: RDO (Remote Door Open/Control) 문 잠금 제어 인입',
-                desc: 'RDO 프로토콜에 따른 문 제어 신호 인입. lock 레지스터 세팅 준비.'
+                summary: '1. App ➔ Server: 원격 문 잠금 제어 인입',
+                desc: 'RDO 프로토콜에 따른 문 제어 신호 인입. lock 레지스터 1 세팅 준비.'
             },
-            'MRC-A START_ENGINE REQUEST': {
+            'MRC-A RDO_UNLOCK REQUEST': {
+                protocol: 'HTTP/1.1 (POST)',
+                summary: '1. App ➔ Server: 원격 문 잠금 해제 제어 인입',
+                desc: 'RDO 프로토콜에 따른 문 제어 신호 인입. lock 레지스터 0 세팅 준비.'
+            },
+            'MRC-A RSC_START_ENGINE REQUEST': {
                 protocol: 'HTTP/1.1 (POST)',
                 summary: '1. App ➔ Server: 원격 시동 점화 요청 인입',
                 desc: '엔진 제어기(EMS) 기동 지시를 위한 무선 신호 트리거.'
             },
-            'PUBLISH_MQTT (START_CLIMATE)': {
+            'PUBLISH_MQTT (RSC_START_CLIMATE)': {
                 protocol: 'MQTT (TCP 1883)',
                 summary: '2. Server ➔ CCU: 공조 구동 지시 패킷 발행',
                 desc: 'ccs/vehicle/{vin}/control 토픽을 통하여 무선 기동 지시 발행.'
             },
-            'PUBLISH_MQTT (RDO)': {
+            'PUBLISH_MQTT (RDO_LOCK)': {
                 protocol: 'MQTT (TCP 1883)',
-                summary: '2. Server ➔ CCU: RDO 도어 제어 지시 패킷 발행',
-                desc: 'ccs/vehicle/{vin}/control 토픽으로 문 개폐 지시 패킷 무선 중계.'
+                summary: '2. Server ➔ CCU: RDO 도어 잠금 지시 패킷 발행',
+                desc: 'ccs/vehicle/{vin}/control 토픽으로 문 잠금 지시 패킷 무선 중계.'
             },
-            'PUBLISH_MQTT (START_ENGINE)': {
+            'PUBLISH_MQTT (RDO_UNLOCK)': {
+                protocol: 'MQTT (TCP 1883)',
+                summary: '2. Server ➔ CCU: RDO 도어 잠금 해제 지시 패킷 발행',
+                desc: 'ccs/vehicle/{vin}/control 토픽으로 문 열림 지시 패킷 무선 중계.'
+            },
+            'PUBLISH_MQTT (RSC_START_ENGINE)': {
                 protocol: 'MQTT (TCP 1883)',
                 summary: '2. Server ➔ CCU: 원격 시동 점화 지시 패킷 발행',
                 desc: '차량 점화 지시용 보안 암호 패킷 무선 퍼블리싱.'
             },
-            'STATUS_REPORT (Code 2000)': {
-                protocol: 'HTTP/1.1 (POST - MO)',
-                summary: '5. CCU ➔ Server: 공조 가동 최종 성공 보고 (MO)',
-                desc: 'FATC 피드백 수집 완료. RSC_CLIMATE_SUCCESS(Code 2000)를 복귀 채널을 통해 보고.'
+            'VSS_SYNC (Code 204)': {
+                protocol: 'HTTP/1.1 (POST - VSS)',
+                summary: '3. CCU ➔ Server: VSS 텔레메트리 변동 동기화',
+                desc: '차량의 물리 상태 레지스터 변동(IGN 상태, RDO 잠금 플래그 등)이 감지되어, CCU가 서버로 변경된 상태 정보만 전송하는 VSS Status Sync 단계입니다. 변동 정보가 없을 시 이 단계는 생략됩니다.'
             },
-            'STATUS_REPORT (Code 2010)': {
+            'STATUS_REPORT (Code 200)': {
                 protocol: 'HTTP/1.1 (POST - MO)',
-                summary: '5. CCU ➔ Server: 원격 시동 기동 최종 성공 보고 (MO)',
-                desc: 'EMS 점화 피드백 감지 성공. RSC_ENGINE_SUCCESS(Code 2010) 응답 복귀.'
+                summary: '5. CCU ➔ Server: 원격 거래 최종 성공 보고 (MO)',
+                desc: '차량 제어기 완료 피드백 수집 완료. MRC_SUCCESS(Code 200) 통합 성공 통보.'
             },
-            'STATUS_REPORT (Code 2040)': {
+            'STATUS_REPORT (Code 4000)': {
                 protocol: 'HTTP/1.1 (POST - MO)',
-                summary: '5. CCU ➔ Server: RDO 문 잠금 최종 성공 보고 (MO)',
-                desc: 'BCM 도어 액추에이터 천이 완료. lock: 1 레지스터 복귀 코드 2040 통보.'
+                summary: '5. CCU ➔ Server: 요청 검증/가입자 인증 거부 (Block)',
+                desc: '서버 가드에 의한 거부. REQ_BLOCKED(Code 4000) 통보.'
             },
-            'STATUS_REPORT (Code 2041)': {
+            'STATUS_REPORT (Code 7000)': {
                 protocol: 'HTTP/1.1 (POST - MO)',
-                summary: '5. CCU ➔ Server: RDO 문 해제 최종 성공 보고 (MO)',
-                desc: 'BCM 도어 개방 완료 피드백. lock: 0 레지스터 복귀 코드 2041 통보.'
-            },
-            'STATUS_REPORT (Code 7930)': {
-                protocol: 'HTTP/1.1 (POST - MO)',
-                summary: '5. CCU ➔ Server: B-CAN 온도 제한 가드 거부 피드백 (Error)',
-                desc: '차량 내부 안전 장치 구동에 의해 CAN 프레임 전송 거부. Code 7930 피드백.'
+                summary: '5. CCU ➔ Server: 차량 하드웨어 및 CAN 전송 오류 (Error)',
+                desc: 'CCU 안전 장치 구동 혹은 물리 통신 유실. VEHICLE_ERR(Code 7000) 통보.'
             },
             'PUSH_NOTIFICATION': {
                 protocol: 'FCM / APNS Push',
@@ -223,20 +228,31 @@
         let currentTxs = [];
         let selectedTx = null;
         let selectedStepIndex = null;
-        let loggedTxIds = new Set(); // 터미널 중복 출력 방지용
+        let lastRawData = "";       // 데이터 변화 상태 비교용 캐시 캐리어
 
         async function fetchTransactions() {
             try {
                 const res = await fetch('/api/v1/lms/transactions');
                 const txs = await res.json();
-                currentTxs = txs;
-                renderList();
-                if (selectedTx) {
-                    const updated = txs.find(t => t.transaction_id === selectedTx.transaction_id);
-                    if (updated) {
-                        selectedTx = updated;
-                        renderLadderAndTelemetry(updated);
-                        streamTerminalLogs(updated);
+                const rawStr = JSON.stringify(txs);
+
+                // 🌟 [최적화 1단계]: 데이터 실질적 변동이 일어난 시점에만 DOM 일괄 업데이트
+                if (rawStr !== lastRawData) {
+                    lastRawData = rawStr;
+                    currentTxs = txs;
+                    renderList();
+                    
+                    if (selectedTx) {
+                        const updated = txs.find(t => t.transaction_id === selectedTx.transaction_id);
+                        if (updated) {
+                            const oldStateStr = JSON.stringify(selectedTx);
+                            const newStateStr = JSON.stringify(updated);
+                            // 선택된 항목의 세부 내용이 변동된 경우에만 리플래시
+                            if (oldStateStr !== newStateStr) {
+                                selectedTx = updated;
+                                renderLadderAndTelemetry(updated);
+                            }
+                        }
                     }
                 }
             } catch (e) {
@@ -246,6 +262,7 @@
 
         function renderList() {
             const listEl = document.getElementById('tx-list');
+            if (!listEl) return;
             if (currentTxs.length === 0) {
                 listEl.innerHTML = '<div class="text-center text-slate-600 py-24 text-[11px]">Active Transactions Empty</div>';
                 return;
@@ -255,18 +272,36 @@
                 const isActive = selectedTx?.transaction_id === tx.transaction_id;
                 const isCompleted = tx.status === 'COMPLETED';
                 const isPending = tx.status === 'PENDING';
-                const badgeClass = isCompleted ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
-                                  isPending ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' : 
-                                  'bg-rose-500/10 text-rose-400 border-rose-500/20';
+                
+                let badgeClass = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+                if (isCompleted) {
+                    if (tx.status_code === 204) {
+                        badgeClass = 'bg-teal-500/10 text-teal-400 border-teal-500/20';
+                    } else {
+                        badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                    }
+                } else if (isPending) {
+                    badgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse';
+                }
+
+                let serviceBadgeClass = 'bg-indigo-500/15 text-indigo-400';
+                if (tx.service === 'VSS') {
+                    serviceBadgeClass = 'bg-teal-500/20 text-teal-300';
+                } else if (tx.service === 'RSC') {
+                    serviceBadgeClass = 'bg-sky-500/15 text-sky-400';
+                }
+                
+                const safeVin = tx.vin ? tx.vin.slice(-6) : '??????';
+                const safeTxId = tx.transaction_id ? tx.transaction_id.slice(0, 8) : '????????';
                 
                 return `
-                    <div onclick="selectTx('${tx.transaction_id}')" class="bg-slate-900/40 hover:bg-slate-900/80 border ${isActive ? 'border-emerald-400 ring-1 ring-emerald-400/20' : 'border-slate-800/80'} p-3 rounded cursor-pointer transition-all flex justify-between items-center">
+                    <div data-tx-id="${tx.transaction_id || ''}" onclick="selectTx('${tx.transaction_id || ''}')" class="bg-slate-900/40 hover:bg-slate-900/80 border ${isActive ? 'border-emerald-400 ring-1 ring-emerald-400/20' : 'border-slate-800/80'} p-3 rounded cursor-pointer transition-all flex justify-between items-center shadow-sm">
                         <div class="space-y-1 w-2/3">
                             <div class="text-[11px] font-bold text-slate-300 flex items-center">
-                                <span class="bg-indigo-500/15 text-indigo-400 text-[9px] px-1.5 py-0.2 rounded mr-1.5 font-mono">${tx.service}</span>
-                                VIN: ...${tx.vin.slice(-6)}
+                                <span class="${serviceBadgeClass} text-[9px] px-1.5 py-0.2 rounded mr-1.5 font-mono font-bold">${tx.service || 'UNKNOWN'}</span>
+                                VIN: ...${safeVin}
                             </div>
-                            <div class="text-[9px] text-slate-600 font-mono truncate">ID: ${tx.transaction_id.slice(0, 8)}</div>
+                            <div class="text-[9px] text-slate-600 font-mono truncate">ID: ${safeTxId}...</div>
                         </div>
                         <div class="text-right">
                             <span class="border px-2 py-0.5 rounded text-[8px] font-bold ${badgeClass}">
@@ -278,54 +313,95 @@
             }).join('');
         }
 
+        // 🌟 [최적화 2단계]: 클릭 이벤트 처리 시 전체 DOM을 날리지 않고 옵셔널 체이닝으로 완벽 예외 제어
         function selectTx(txId) {
+            if (!txId) return;
             const tx = currentTxs.find(t => t.transaction_id === txId);
             if (!tx) return;
             selectedTx = tx;
             selectedStepIndex = null;
             
-            document.getElementById('empty-ladder').style.display = 'none';
-            document.getElementById('ladder-view').style.display = 'flex';
+            const emptyLadder = document.getElementById('empty-ladder');
+            const ladderView = document.getElementById('ladder-view');
+            if (emptyLadder) emptyLadder.style.display = 'none';
+            if (ladderView) ladderView.style.display = 'flex';
             
-            renderList();
+            // 고속 CSS Toggling을 활용해 수동 클릭 처리 레이턴시를 0ms로 대폭 단축
+            const cards = document.querySelectorAll('#tx-list > div');
+            cards.forEach(card => {
+                const cardTxId = card.getAttribute('data-tx-id');
+                if (cardTxId === txId) {
+                    card.classList.add('border-emerald-400', 'ring-1', 'ring-emerald-400/20');
+                    card.classList.remove('border-slate-800/80');
+                } else {
+                    card.classList.remove('border-emerald-400', 'ring-1', 'ring-emerald-400/20');
+                    card.classList.add('border-slate-800/80');
+                }
+            });
+            
             renderLadderAndTelemetry(tx);
             inspectDefaultTx(tx);
-            streamTerminalLogs(tx, true); // 강제 로그 리플래시
         }
 
         function renderLadderAndTelemetry(tx) {
-            // [1] 콤팩트 ECU REGISTER STATUS BAR 연동
-            document.getElementById('reg-car-model').innerText = `${tx.profile.model_name || 'GENESIS'} (${tx.profile.eco_type || 'ICE'})`;
-            document.getElementById('reg-tx-id').innerText = `TX: ${tx.transaction_id}`;
+            if (!tx) return;
+            
+            const modelName = tx.profile?.model_name || 'GENESIS';
+            const ecoType = tx.profile?.eco_type || 'ICE';
+            
+            document.getElementById('reg-car-model').innerText = `${modelName} (${ecoType})`;
+            document.getElementById('reg-tx-id').innerText = `TX: ${tx.transaction_id || ''}`;
 
             const regEngine = document.getElementById('reg-engine');
             const regDoor = document.getElementById('reg-door');
             const regTemp = document.getElementById('reg-temp');
 
-            // 실무 사양 매핑 (RDO, lock: 0/1)
-            if (tx.status === 'COMPLETED') {
-                if (tx.vehicle_state) {
-                    const vState = tx.vehicle_state;
-                    
-                    // 시동 엔진 상태 매핑
-                    regEngine.innerText = vState.engine_status === 1 ? "1 (DRIVE READY)" : "0 (STANDBY)";
-                    regEngine.className = vState.engine_status === 1 ? "font-bold text-emerald-400" : "font-bold text-slate-400";
-                    
-                    // RDO 잠금 상태 매핑
-                    regDoor.innerText = vState.rdo_state.lock === 1 ? "1 (LOCKED)" : "0 (UNLOCKED)";
-                    regDoor.className = vState.rdo_state.lock === 1 ? "font-bold text-emerald-400" : "font-bold text-amber-400";
-                    
-                    // 공조 및 온도 매핑
-                    if (vState.climate_state.active === 1) {
-                        regTemp.innerText = `${parseFloat(vState.climate_state.target_temp).toFixed(1)}°C`;
-                        regTemp.className = "font-bold text-teal-400 animate-pulse";
-                    } else {
-                        regTemp.innerText = "OFF";
-                        regTemp.className = "font-bold text-slate-400";
-                    }
+            const wireB1 = document.getElementById('wire-b1');
+            const wireAcc = document.getElementById('wire-acc');
+            const wireIgn1 = document.getElementById('wire-ign1');
+
+            if (tx.vehicle_state) {
+                const vState = tx.vehicle_state;
+                const ignState = vState.ign_state || 0;
+                
+                if (ignState === 3) {
+                    regEngine.innerText = "3 (KEY_START)";
+                    regEngine.className = "font-bold text-emerald-400 animate-pulse";
+                } else if (ignState === 2) {
+                    regEngine.innerText = "2 (IGN_ON)";
+                    regEngine.className = "font-bold text-yellow-400";
+                } else if (ignState === 1) {
+                    regEngine.innerText = "1 (ACC)";
+                    regEngine.className = "font-bold text-amber-500";
+                } else {
+                    regEngine.innerText = "0 (PANEL_OFF)";
+                    regEngine.className = "font-bold text-slate-400";
+                }
+
+                if (wireB1) wireB1.innerText = vState.wires?.b1 !== undefined ? vState.wires.b1 : '1';
+                if (wireAcc) {
+                    wireAcc.innerText = vState.wires?.acc || '0';
+                    wireAcc.className = vState.wires?.acc === 1 ? "text-emerald-400 font-bold font-mono" : "text-slate-500 font-bold font-mono";
+                }
+                if (wireIgn1) {
+                    wireIgn1.innerText = vState.wires?.ign1 || '0';
+                    wireIgn1.className = vState.wires?.ign1 === 1 ? "text-emerald-400 font-bold font-mono" : "text-slate-500 font-bold font-mono";
+                }
+                
+                const lockState = vState.rdo_state?.lock;
+                regDoor.innerText = lockState === 1 ? "1 (LOCKED)" : lockState === 0 ? "0 (UNLOCKED)" : "UNKNOWN";
+                regDoor.className = lockState === 1 ? "font-bold text-emerald-400" : "font-bold text-amber-400";
+                
+                if (vState.climate_state?.active === 1) {
+                    const targetTemp = vState.climate_state?.target_temp !== undefined ? parseFloat(vState.climate_state.target_temp).toFixed(1) : 'OFF';
+                    regTemp.innerText = `${targetTemp}°C`;
+                    regTemp.className = "font-bold text-teal-400";
+                } else {
+                    regTemp.innerText = "OFF";
+                    regTemp.className = "font-bold text-slate-400";
                 }
             } else {
-                regEngine.innerText = "0 (STANDBY)";
+                regEngine.innerText = "0 (PANEL_OFF)";
                 regEngine.className = "font-bold text-slate-500";
                 regDoor.innerText = "1 (LOCKED)";
                 regDoor.className = "font-bold text-slate-500";
@@ -333,15 +409,26 @@
                 regTemp.className = "font-bold text-slate-500";
             }
 
-            // [2] 사다리 다이어그램 화살표 렌더링 (CSS Grid 정밀 정렬)
             const container = document.getElementById('sequence-steps-container');
+            if (!container) return;
+            if (!tx.steps) {
+                container.innerHTML = '';
+                return;
+            }
+
             container.innerHTML = tx.steps.map((step, idx) => {
                 const pos = getStepPositionAndDirection(step.from, step.to);
                 const isSelected = selectedStepIndex === idx;
                 
                 let arrowColor = 'border-indigo-500 text-indigo-400';
                 if (step.from === 'App' || step.to === 'App') arrowColor = 'border-sky-500 text-sky-400';
-                if (step.from === 'CCU' || step.to === 'CCU') arrowColor = 'border-yellow-500 text-yellow-400';
+                if (step.from === 'CCU' || step.to === 'CCU') {
+                    if (step.msg && step.msg.includes("VSS_SYNC")) {
+                        arrowColor = 'border-teal-500 text-teal-400';
+                    } else {
+                        arrowColor = 'border-yellow-500 text-yellow-400';
+                    }
+                }
                 if (step.from === 'ECU' || step.to === 'ECU') arrowColor = 'border-emerald-500 text-emerald-400';
                 if (tx.status === 'FAILED' && idx === tx.steps.length - 1) arrowColor = 'border-rose-500 text-rose-400';
 
@@ -353,7 +440,7 @@
                         <div class="absolute h-0.5 border-t ${arrowColor} border-dashed" style="left: ${pos.left}%; width: ${pos.width}%;">
                             <span class="absolute ${arrowStyle} text-xs"><i class="fa-solid ${arrowIcon}"></i></span>
                             <span class="absolute left-1/2 -translate-x-1/2 -top-3.5 bg-slate-950 border border-slate-800 px-1.5 py-0.2 rounded text-[8px] font-bold text-slate-300 select-none">
-                                ${step.msg}
+                                ${step.msg || ''}
                             </span>
                         </div>
                     </div>
@@ -362,10 +449,9 @@
         }
 
         function getStepPositionAndDirection(from, to) {
-            // 헤더 그리드 중앙 정렬 좌표 (12.5%, 37.5%, 62.5%, 87.5%)와 100% 정렬
             const coords = { 'App': 12.5, 'Server': 37.5, 'CCU': 62.5, 'ECU': 87.5 };
-            const start = coords[from];
-            const end = coords[to];
+            const start = coords[from] || 12.5;
+            const end = coords[to] || 37.5;
             const left = Math.min(start, end);
             const width = Math.abs(start - end);
             const direction = end > start ? 'right' : 'left';
@@ -373,85 +459,68 @@
         }
 
         function inspectDefaultTx(tx) {
-            document.getElementById('inspect-protocol').innerText = `PROT: DB_SCHEMA`;
-            document.getElementById('inspect-summary').innerText = `Transaction_ID: ${tx.transaction_id}`;
-            document.getElementById('inspect-desc').innerText = `전체 패킷 데이터베이스 구조가 로드되었습니다. 시퀀스 선을 클릭하면 스텝별 네트워크 분석 가이드라인을 확인하실 수 있습니다.`;
-            document.getElementById('inspect-json').innerText = JSON.stringify(tx, null, 2);
+            if (!tx) return;
+            const inspectProtocol = document.getElementById('inspect-protocol');
+            const inspectSummary = document.getElementById('inspect-summary');
+            const inspectDesc = document.getElementById('inspect-desc');
+            const inspectJson = document.getElementById('inspect-json');
+
+            if (inspectProtocol) inspectProtocol.innerText = `PROT: DB_SCHEMA`;
+            if (inspectSummary) inspectSummary.innerText = `Transaction_ID: ${tx.transaction_id || ''}`;
+            if (inspectDesc) {
+                const model = tx.profile?.model_name || '-';
+                const eco = tx.profile?.eco_type || '-';
+                inspectDesc.innerText = `차종 정보: ${model} (${eco})\n전체 패킷 데이터베이스 구조가 로드되었습니다. 시퀀스 선을 클릭하면 스텝별 네트워크 분석 가이드라인을 확인하실 수 있습니다.`;
+            }
+            if (inspectJson) inspectJson.innerText = JSON.stringify(tx, null, 2);
         }
 
         function inspectStep(idx) {
-            if (!selectedTx) return;
+            if (!selectedTx || !selectedTx.steps) return;
             selectedStepIndex = idx;
             renderLadderAndTelemetry(selectedTx);
 
             const step = selectedTx.steps[idx];
+            if (!step) return;
             
-            let lookupKey = step.msg;
-            if (step.msg.startsWith("MRC-A") && step.msg.includes("REQUEST")) {
-                lookupKey = `MRC-A ${selectedTx.command} REQUEST`;
-            } else if (step.msg.startsWith("PUBLISH_MQTT")) {
-                lookupKey = `PUBLISH_MQTT (${selectedTx.command})`;
+            let lookupKey = step.msg || '';
+            if (lookupKey.startsWith("MRC-A") && lookupKey.includes("REQUEST")) {
+                lookupKey = `MRC-A ${selectedTx.command || ''} REQUEST`;
+            } else if (lookupKey.startsWith("PUBLISH_MQTT")) {
+                lookupKey = `PUBLISH_MQTT (${selectedTx.command || ''})`;
             }
 
             const meta = STEP_EXPLANATIONS[lookupKey] || {
                 protocol: 'E2E_BUS',
-                summary: step.msg,
+                summary: step.msg || '',
                 desc: '가상 차량 버스 통신 이력입니다.'
             };
 
-            document.getElementById('inspect-protocol').innerText = `PROT: ${meta.protocol}`;
-            document.getElementById('inspect-summary').innerText = meta.summary;
-            document.getElementById('inspect-desc').innerText = meta.desc;
+            const inspectProtocol = document.getElementById('inspect-protocol');
+            const inspectSummary = document.getElementById('inspect-summary');
+            const inspectDesc = document.getElementById('inspect-desc');
+            const inspectJson = document.getElementById('inspect-json');
 
-            // 정밀 패킷 전송 바인딩 정보
+            if (inspectProtocol) inspectProtocol.innerText = `PROT: ${meta.protocol}`;
+            if (inspectSummary) inspectSummary.innerText = meta.summary;
+            if (inspectDesc) inspectDesc.innerText = meta.desc;
+
+            const stepTimestampStr = step.timestamp ? new Date(step.timestamp * 1000).toISOString() : new Date().toISOString();
+
             const stepJson = {
                 step_idx: idx + 1,
-                transmission: `${step.from} ➔ ${step.to}`,
-                event_message: step.msg,
-                timestamp: new Date(step.timestamp * 1000).toISOString(),
-                provision_state: selectedTx.provision_state,
-                vehicle_state: selectedTx.vehicle_state
+                transmission: `${step.from || ''} ➔ ${step.to || ''}`,
+                event_message: step.msg || '',
+                timestamp: stepTimestampStr,
+                provision_state: selectedTx.provision_state || {},
+                vehicle_state: selectedTx.vehicle_state || {}
             };
-            document.getElementById('inspect-json').innerText = JSON.stringify(stepJson, null, 2);
-        }
-
-        // [실무용 터미널 로그 시뮬레이션 스트리머]
-        function streamTerminalLogs(tx, forceRefresh = false) {
-            const term = document.getElementById('terminal-log');
-            if (forceRefresh) {
-                term.innerHTML = `<div class="text-slate-600">[SYSTEM] Terminal flushed. Loading TX logs...</div>`;
-                loggedTxIds.delete(tx.transaction_id);
-            }
-
-            if (loggedTxIds.has(tx.transaction_id) && !forceRefresh) return; // 이미 쌓인 로그는 중복 노출 차단
-            loggedTxIds.add(tx.transaction_id);
-
-            tx.steps.forEach((step, index) => {
-                setTimeout(() => {
-                    let logLine = "";
-                    const timeStr = new Date(step.timestamp * 1000).toLocaleTimeString();
-                    
-                    if (step.from === 'App' && step.to === 'Server') {
-                        logLine = `<div class="text-sky-400">[${timeStr}][CELLULAR_IN] App ➔ Server: ${step.msg} (VIN: ${tx.vin})</div>`;
-                    } else if (step.from === 'Server' && step.to === 'CCU') {
-                        logLine = `<div class="text-indigo-400">[${timeStr}][MQTT_TX] Publish to topic [ccs/vehicle/${tx.vin}/control] Payload: {"command": "${tx.command}"}</div>`;
-                    } else if (step.from === 'CCU' && step.to === 'Server') {
-                        logLine = `<div class="text-yellow-400">[${timeStr}][CELLULAR_OUT] CCU ➔ Server STATUS_REPORT (Code: ${tx.status_code})</div>`;
-                    } else if (step.from === 'Server' && step.to === 'App') {
-                        const styleColor = tx.status === 'COMPLETED' ? 'text-emerald-400' : 'text-rose-400';
-                        logLine = `<div class="${styleColor}">[${timeStr}][FCM_PUSH] FCM Gateway ➔ Push Sent (Result: ${tx.status})</div>`;
-                    }
-                    
-                    if (logLine) {
-                        term.innerHTML += logLine;
-                        term.scrollTop = term.scrollHeight; // 가장 하단으로 자동 스크롤
-                    }
-                }, index * 200); // 0.2초 간격 리얼타임 타자기 연출
-            });
+            if (inspectJson) inspectJson.innerText = JSON.stringify(stepJson, null, 2);
         }
 
         function copyRawJson() {
             const pre = document.getElementById('inspect-json');
+            if (!pre) return;
             navigator.clipboard.writeText(pre.innerText).then(() => {
                 alert("TMS Packet 데이터가 클립보드에 성공적으로 복사되었습니다.");
             }).catch(err => {
@@ -465,8 +534,9 @@
             });
         }
 
+        // 실시간 텔레메트리 폴링 루프 실행
         setInterval(fetchTransactions, 1000);
         fetchTransactions();
     </script>
 </body>
-</html
+</html>

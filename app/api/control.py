@@ -21,7 +21,7 @@ MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", DEFAULT_HOST)
 # -----------------------------------------------------------------------------
 class ControlRequest(BaseModel):
     vin: str = Field(..., description="차량 고유 차대번호", examples=["KMHCT41BPJU123456"])
-    command: str = Field(..., description="제어 명령 (START_CLIMATE, RDO_LOCK, RDO_UNLOCK, START_ENGINE)", examples=["START_CLIMATE"])
+    command: str = Field(..., description="제어 명령 (RSC_START_CLIMATE, RSC_START_ENGINE, RDO_LOCK, RDO_UNLOCK)", examples=["RSC_START_CLIMATE"])
     temperature: Optional[float] = Field(None, description="설정 온도 (공조 제어 필수)", examples=[23.5])
 
 # -----------------------------------------------------------------------------
@@ -65,16 +65,28 @@ async def remote_control_vehicle(request: ControlRequest):
     # [데이터 유효성 가드 확인 전 프로파일 조회]
     profile = get_vehicle_profile(request.vin)
     
-    # 🌟 [실무 사양 고도화] RDO로 도어 명령 통일 및 개통/물리 레지스터 상태 분리 설계
+    # 🌟 메모리상의 최근 완료된 트랜잭션에서 이 차량의 가장 최신 전원(ign_state) 및 잠금 상태 계승 조회
+    current_ign_state = 0  # Default PANEL_OFF
+    current_lock_state = 1 # Default LOCKED
+    for t in reversed(LMS_TRANSACTIONS):
+        if t["vin"] == request.vin and t["status"] == "COMPLETED":
+            current_ign_state = t["vehicle_state"]["ign_state"]
+            current_lock_state = t["vehicle_state"]["rdo_state"]["lock"]
+            break
+
+    # 🌟 [피드백 반영] RSC / RDO 서비스 분류 버그 전면 수정
+    # 구형 명령명(START_CLIMATE)이 들어오더라도 단어가 포함되어 있다면 완벽하게 RSC로 바인딩합니다.
+    is_rsc = "RSC" in request.command or "CLIMATE" in request.command or "ENGINE" in request.command
+
     tx_log = {
         "transaction_id": tx_id,
         "vin": request.vin,
-        "service": "RSC" if "CLIMATE" in request.command or "ENGINE" in request.command else "RDO",
-        "command": "RDO_LOCK" if request.command == "LOCK_DOOR" else "RDO_UNLOCK" if request.command == "UNLOCK_DOOR" else request.command,
+        "service": "RSC" if is_rsc else "RDO",
+        "command": request.command,
         "status": "PENDING",
         "status_code": None,
         
-        # 1. 개통 정보 DB 스키마 분리
+        # 1. 개통 마스터 정보 DB 스키마
         "provision_state": {
             "vin": request.vin,
             "nad_id": profile["nad_id"] if profile else "UNREGISTERED",
@@ -83,15 +95,20 @@ async def remote_control_vehicle(request: ControlRequest):
             "is_activated": profile["is_activated"] if profile else False
         },
         
-        # 2. 차량 ECU 실제 레지스터 상태 스키마 분리
+        # 2. 차량 ECU 실제 레지스터 및 전원 와이어링 상태 스키마
         "vehicle_state": {
-            "engine_status": 0,          # 0: STANDBY, 1: DRIVE_READY
+            "ign_state": current_ign_state,  # 0:PANEL_OFF, 1:ACC, 2:IGN_ON, 3:KEY_START
+            "wires": {
+                "b1": 1,                     
+                "acc": 1 if current_ign_state >= 1 else 0,
+                "ign1": 1 if current_ign_state >= 2 else 0
+            },
             "rdo_state": {
-                "lock": 1,               # 0: UNLOCKED, 1: LOCKED
-                "door_open": 0           # 0: ALL_CLOSED
+                "lock": current_lock_state,   
+                "door_open": 0               
             },
             "climate_state": {
-                "active": 0,             # 0: OFF, 1: ACTIVE
+                "active": 1 if current_ign_state == 3 else 0,
                 "target_temp": request.temperature if "CLIMATE" in request.command else 22.0
             }
         },
@@ -108,57 +125,68 @@ async def remote_control_vehicle(request: ControlRequest):
         ]
     }
     
-    # 2. 개통 여부 검증 (Provisioning Check)
+    # 2. 개통 여부 검증 (Provisioning Check) -> 에러코드 4000 차단
     if not profile:
         tx_log["status"] = "FAILED"
-        tx_log["status_code"] = 4030
-        tx_log["vehicle_feedback"] = "등록되지 않은 차대번호 요청"
+        tx_log["status_code"] = 4000
+        tx_log["vehicle_feedback"] = "4000: 미등록 차대번호 접근 차단"
         LMS_TRANSACTIONS.append(tx_log)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="4030: 미등록된 단말 정보의 접근입니다."
+            detail="4000: 미등록된 단말 정보의 접근입니다."
         )
     
     if not profile["is_activated"]:
         tx_log["status"] = "FAILED"
-        tx_log["status_code"] = 4031
-        tx_log["vehicle_feedback"] = "미개통 단말기로 제어 차단됨"
+        tx_log["status_code"] = 4000
+        tx_log["vehicle_feedback"] = "4000: 미개통 가입자 제어 차단"
         tx_log["steps"].append({
             "from": "Server", "to": "App", "msg": "BLOCKED_BY_PROVISIONING", "timestamp": time.time()
         })
         LMS_TRANSACTIONS.append(tx_log)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="4031: 개통이 해지되거나 만료된 차량 단말기입니다."
+            detail="4000: 개통이 해지되거나 만료된 차량 단말기입니다."
         )
 
-    # 3. 차종별(ECO Type) 지원 한계 가드 처리
-    if profile["eco_type"] == "EV" and request.command == "START_ENGINE":
+    # 3. [차량 기능 안전 가드] 시동 중(KEY_START) RDO 차단 로직
+    if "RDO" in request.command and current_ign_state == 3:
         tx_log["status"] = "FAILED"
-        tx_log["status_code"] = 4002
-        tx_log["vehicle_feedback"] = "EV 차종에 시동 명령 차단"
+        tx_log["status_code"] = 4000
+        tx_log["vehicle_feedback"] = "4000: KEY_START 상태 원격 문 제어(RDO) 제한"
         LMS_TRANSACTIONS.append(tx_log)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="4002: EV 차량은 기계적인 엔진 시동(START_ENGINE)을 지원하지 않습니다."
+            detail="4000: 차량이 KEY_START (엔진구동) 중이므로 안전을 위해 RDO 제어를 차단합니다."
         )
 
-    # 4. 공조 제어 온도 파라미터 체크
+    # 4. 차종별(ECO Type) 지원 한계 가드 처리 -> 에러코드 4000으로 통일
+    if profile["eco_type"] == "EV" and "ENGINE" in request.command:
+        tx_log["status"] = "FAILED"
+        tx_log["status_code"] = 4000
+        tx_log["vehicle_feedback"] = "4000: EV 차종 원격 엔진시동 가드 차단"
+        LMS_TRANSACTIONS.append(tx_log)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="4000: EV 차량은 기계적인 엔진 시동(RSC_START_ENGINE)을 지원하지 않습니다."
+        )
+
+    # 5. 공조 제어 온도 파라미터 체크 -> 에러코드 4000으로 통일
     if "CLIMATE" in request.command and request.temperature is None:
         tx_log["status"] = "FAILED"
         tx_log["status_code"] = 4000
-        tx_log["vehicle_feedback"] = "공조 설정 온도 누락"
+        tx_log["vehicle_feedback"] = "4000: 공조 설정 온도 파라미터 누락"
         LMS_TRANSACTIONS.append(tx_log)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="4000: 공조 기동에는 목표 온도가 필수입니다."
         )
 
-    # 5. 모든 서버 가드를 통과하면, 무선 릴레이 시도 전 LMS 히스토리에 먼저 등록하여 대기상태 노출
+    # 6. 모든 서버 가드를 통과하면, 무선 릴레이 시도 전 LMS 히스토리에 먼저 등록하여 대기상태 노출
     mqtt_topic = f"ccs/vehicle/{request.vin}/control"
     
-    # 🌟 [실무 사양 반영] RDO 명령어로 표준화 변환
-    trans_command = "RDO" if "DOOR" in request.command else request.command
+    # RDO 명칭 세부 통일성 가드
+    trans_command = "RDO" if "RDO" in request.command or "DOOR" in request.command else request.command
     mqtt_payload = {
         "transaction_id": tx_id,
         "command": trans_command,
@@ -171,13 +199,13 @@ async def remote_control_vehicle(request: ControlRequest):
     
     LMS_TRANSACTIONS.append(tx_log)
     
-    # 6. 실질적 무선 메시지 전송 시도 (동기식 보장)
+    # 7. 실질적 무선 메시지 전송 시도 -> 브로커 연결 오류는 7000으로 통일
     try:
         publish_mqtt_message(mqtt_topic, mqtt_payload)
     except HTTPException as he:
         tx_log["status"] = "FAILED"
         tx_log["status_code"] = 7000
-        tx_log["vehicle_feedback"] = "무선 전송 실패 (MQTT 브로커 끊김)"
+        tx_log["vehicle_feedback"] = "7000: 무선 전송 실패 (MQTT 브로커 끊김)"
         tx_log["steps"].append({
             "from": "Server", "to": "App", "msg": "BROKER_CONNECTION_ERROR", "timestamp": time.time()
         })
