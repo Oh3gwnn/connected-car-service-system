@@ -8,3 +8,5 @@ playwright
 httpx               # FastAPI 서버가 외부 통신을 하거나 모바일과 연동할 때 쓸 비동기 HTTP 라이브러리
 python-can          # 리눅스 가상 CAN(vcan) 버스에 메시지를 쏘고 받기 위한 도구
 cantools            # .dbc 파일을 파이썬으로 읽고 CAN 메시지를 해석해주는 도구
+
+requests            # (테스트용) FastAPI 서버에 HTTP 요청을 보내는 라이브러리
