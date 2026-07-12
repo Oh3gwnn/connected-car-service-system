@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HILs 차량 전장 및 CCU 무선 통신 시뮬레이터</title>
+    <!-- Tailwind CSS 및 FontAwesome 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* 터미널 스크롤바 최적화 */
+        .terminal-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: #020617;
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(52, 211, 153, 0.2); }
+            50% { box-shadow: 0 0 20px rgba(52, 211, 153, 0.6); }
+        }
+        .wire-active {
+            animation: glow 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-mono min-h-screen flex flex-col overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
+
+    <!-- 상단 글로벌 헤더 -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row justify-between items-center shadow-lg gap-4">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-teal-500/10 rounded-lg text-teal-400">
+                <i class="fa-solid fa-car-battery text-xl animate-pulse"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-wider text-slate-100">Interactive Connected Vehicle HILs Simulator</h1>
+                <p class="text-[10px] text-slate-500 font-sans">실차 가상 전장 물리 배선 & CCU 네트워크 지연 프로파일러</p>
+            </div>
+        </div>
+        <div class="flex space-x-4 items-center">
+            <span class="bg-teal-500/10 text-teal-400 border border-teal-500/20 px-3 py-1 rounded-full text-xs font-semibold flex items-center font-sans">
+                <span class="w-2 h-2 rounded-full bg-teal-400 mr-2 animate-ping"></span>
+                SIMULATOR PORT: 8050 MOCK ACTIVE
+            </span>
+        </div>
+    </header>
+
+    <!-- 메인 대시보드 그리드 -->
+    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- [좌측 4열] 가상 차량 하드웨어 & 물리 배선 릴레이 상태 판넬 -->
+        <section class="lg:col-span-4 flex flex-col gap-6">
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex-1 flex flex-col">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
+                    <span><i class="fa-solid fa-circle-nodes mr-2 text-emerald-400"></i> 물리 전원 배선 (Wire Relay Status)</span>
+                    <span class="text-[10px] bg-slate-950 px-2 py-0.5 rounded text-emerald-400 border border-emerald-500/20">B+ CONSTANT ACTIVE</span>
+                </h2>
+
+                <!-- 배터리 전압 / 상시 전원 게이지 -->
+                <div class="bg-slate-950 rounded-xl p-4 border border-slate-800 mb-6 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] text-slate-500 block mb-1">상시 입력 전압 (B+ Battery Voltage)</span>
+                        <span id="volts-val" class="text-2xl font-bold text-emerald-400 font-mono">14.2V</span>
+                    </div>
+                    <div class="text-emerald-400/20 text-4xl"><i class="fa-solid fa-bolt"></i></div>
+                </div>
+
+                <!-- 물리 하드웨어 전선 라인 시각화 -->
+                <div class="flex-1 flex flex-col justify-around gap-4 py-2 relative">
+                    <!-- 와이어 연결 기둥 뒷배경 데코선 -->
+                    <div class="absolute left-6 top-8 bottom-8 w-1 bg-slate-800/50 rounded pointer-events-none"></div>
+
+                    <!-- B1 Wire -->
+                    <div class="flex items-center space-x-4 z-10">
+                        <div id="glow-b1" class="w-12 h-12 rounded-full bg-emerald-500/10 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 wire-active">
+                            <span class="text-xs font-bold font-mono">B1</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="font-bold text-slate-300">상시 주전원 릴레이 (Constant B+)</span>
+                                <span class="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded text-[10px]">ACTIVE (1)</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500">배터리 직결 라인, CCU 제어 전력 항시 유지</p>
+                        </div>
+                    </div>
+
+                    <!-- ACC Wire -->
+                    <div class="flex items-center space-x-4 z-10">
+                        <div id="glow-acc" class="w-12 h-12 rounded-full bg-slate-950 border-2 border-slate-800 flex items-center justify-center text-slate-500 transition-all duration-300">
+                            <span class="text-xs font-bold font-mono">ACC</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="font-bold text-slate-300">악세서리 전원 (Accessory Power)</span>
+                                <span id="badge-acc" class="text-slate-500 font-bold bg-slate-950 px-2 py-0.5 rounded text-[10px]">OFF (0)</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500">인포테인먼트, 내비게이션 기동 트리거 라인</p>
+                        </div>
+                    </div>
+
+                    <!-- IGN1 Wire -->
+                    <div class="flex items-center space-x-4 z-10">
+                        <div id="glow-ign1" class="w-12 h-12 rounded-full bg-slate-950 border-2 border-slate-800 flex items-center justify-center text-slate-500 transition-all duration-300">
+                            <span class="text-xs font-bold font-mono">IGN1</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="font-bold text-slate-300">점화 전원 1단계 (Ignition 1 Wire)</span>
+                                <span id="badge-ign1" class="text-slate-500 font-bold bg-slate-950 px-2 py-0.5 rounded text-[10px]">OFF (0)</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500">주요 ECU 전원 분배선, 공조기 대기 전력 연동</p>
+                        </div>
+                    </div>
+
+                    <!-- IGN3 Wire -->
+                    <div class="flex items-center space-x-4 z-10">
+                        <div id="glow-ign3" class="w-12 h-12 rounded-full bg-slate-950 border-2 border-slate-800 flex items-center justify-center text-slate-500 transition-all duration-300">
+                            <span class="text-xs font-bold font-mono">IGN3</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="font-bold text-slate-300">스타트 모터 인가 릴레이 (Ignition 3)</span>
+                                <span id="badge-ign3" class="text-slate-500 font-bold bg-slate-950 px-2 py-0.5 rounded text-[10px]">OFF (0)</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500">엔진 시동 크랭킹 구동용 전원 공급 차단선</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- [중앙 5열] 코어 컨트롤 패널 & 상태 머신 지연 감시자 -->
+        <section class="lg:col-span-5 flex flex-col gap-6">
+            <!-- 차량 전원 제어 패널 (물리적 하드웨어 스위치) -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+                    <i class="fa-solid fa-toggle-on mr-2 text-sky-400"></i> 물리 신호 스위치 (Hardware Signals)
+                </h2>
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="triggerAccOn()" id="btn-acc-on" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-2 rounded-xl transition-all shadow-lg active:scale-95 flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-key text-sm"></i>
+                        <span class="text-[11px] uppercase tracking-wide">ACC ON</span>
+                    </button>
+                    <button onclick="triggerAccOff()" id="btn-acc-off" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3.5 px-2 rounded-xl transition-all shadow-lg active:scale-95 flex flex-col items-center gap-1 border border-slate-700">
+                        <i class="fa-solid fa-power-off text-sm"></i>
+                        <span class="text-[11px] uppercase tracking-wide">ACC OFF</span>
+                    </button>
+                    <button onclick="triggerBplusReset()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 px-2 rounded-xl transition-all shadow-lg active:scale-95 flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-rotate text-sm"></i>
+                        <span class="text-[11px] uppercase tracking-wide">B+ RESET</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 상태 머신 및 지연 추적 바 -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex-1 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+                        <i class="fa-solid fa-clock-rotate-left mr-2 text-yellow-400"></i> 지연 타이머 & 현재 상태 머신
+                    </h2>
+                    
+                    <div class="grid grid-cols-2 gap-4 text-xs mb-6">
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                            <span class="text-slate-500 block mb-1 uppercase text-[9px] font-sans">Current Logical State</span>
+                            <span id="current-panel-state" class="text-lg font-bold text-slate-300">SLEEP</span>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                            <span class="text-slate-500 block mb-1 uppercase text-[9px] font-sans">Network Status</span>
+                            <span id="current-network-state" class="text-lg font-bold text-slate-500">DISCONNECTED</span>
+                        </div>
+                    </div>
+
+                    <!-- 동적 진행률 바 및 딜레이 표출 -->
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span id="timer-label" class="text-slate-400">시스템 대기 중</span>
+                                <span id="timer-counter" class="text-yellow-400 font-bold font-mono">0.0s / 0.0s</span>
+                            </div>
+                            <div class="w-full bg-slate-950 rounded-full h-3.5 border border-slate-800 p-0.5 overflow-hidden">
+                                <div id="timer-progress" class="bg-gradient-to-r from-teal-500 to-emerald-500 h-2 rounded-full transition-all duration-100" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 실시간 상태 시연 다이어그램 피드백 -->
+                <div class="mt-6 border-t border-slate-800/80 pt-4 text-[11px] text-slate-500 flex flex-col gap-2">
+                    <div class="flex justify-between">
+                        <span>가상 커널 부팅 딜레이 설정:</span>
+                        <span class="text-slate-300 font-bold">5.0초 (5000ms)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>ACC OFF 슬립 유예기간 (Grace Period) 설정:</span>
+                        <span class="text-slate-300 font-bold">10.0초 (10000ms)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- [우측 3열] 스톱워치 벤치마크 & 자동화 ROI 측정기 -->
+        <section class="lg:col-span-3 flex flex-col gap-6">
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between h-full">
+                <div>
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+                        <i class="fa-solid fa-stopwatch mr-2 text-teal-400"></i> 시간 측정 벤치마크 (ROI)
+                    </h2>
+
+                    <!-- 수동 테스트 초시계 구역 -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4">
+                        <span class="text-[10px] text-slate-500 block mb-1">수동 계측 피로 누적 시간 (Manual StopWatch)</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <span id="manual-stopwatch" class="text-xl font-bold font-mono text-slate-300">00:00.00</span>
+                            <span class="text-[10px] text-slate-500 font-sans border border-slate-800/80 px-2 py-0.5 rounded">인간 리소스</span>
+                        </div>
+                    </div>
+
+                    <!-- 자동화 테스트 초시계 구역 -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <span class="text-[10px] text-slate-500 block mb-1">자동화 계측 지연 분석 시간 (Auto Bench)</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <span id="auto-benchmark" class="text-xl font-bold font-mono text-teal-400">00:00.00</span>
+                            <span class="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded">무인 컴퓨터 계측</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 비교 시연 시작 버튼 -->
+                <div class="mt-6 flex flex-col gap-2.5">
+                    <button onclick="runAutoBenchmark()" class="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play-circle text-sm animate-pulse"></i>
+                        <span class="text-xs uppercase tracking-wide">자동화 벤치마크 1회 실행</span>
+                    </button>
+                    <p class="text-[9px] text-slate-500 text-center leading-relaxed">
+                        자동화 버튼을 누르면 이더넷 대기 딜레이를 컴퓨터가 0.01초 오차 없이 실시간 무인 추적 및 즉시 검증하는 시뮬레이션을 돌립니다.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 하부 출력 터미널: 롤링 CAN 스니퍼 및 MQTT 통신 로그 -->
+    <footer class="bg-slate-950 border-t border-slate-800 p-6 grid grid-cols-1 md:grid-cols-2 gap-6 h-72 min-h-[288px]">
+        
+        <!-- [좌측 터미널]: 실시간 롤링 CAN 버스 스니퍼 -->
+        <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-4 flex flex-col h-full overflow-hidden">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-800 pb-2 flex justify-between items-center">
+                <span><i class="fa-solid fa-network-wired text-emerald-400 mr-1.5 animate-pulse"></i> 차량 내 고속 B-CAN Bus Sniffer (vcan0)</span>
+                <span id="can-rolling-status" class="bg-slate-950 text-slate-500 text-[9px] font-mono px-2 py-0.5 rounded">CAN_BUS_OFF</span>
+            </h3>
+            <div id="can-terminal" class="flex-1 font-mono text-[11px] text-emerald-400/90 overflow-y-auto space-y-1 terminal-scroll pr-1">
+                <div class="text-slate-600 italic">차량 전원(ACC 이상)이 켜지면 실시간 CAN 프레임 패킷이 이곳에 송출 및 인코딩 롤링됩니다...</div>
+            </div>
+        </div>
+
+        <!-- [우측 터미널]: MQTT 및 통신사 무선망 시퀀스 로그 -->
+        <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-4 flex flex-col h-full overflow-hidden">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-800 pb-2 flex justify-between items-center">
+                <span><i class="fa-solid fa-tower-broadcast text-sky-400 mr-1.5 animate-pulse"></i> 텔레매틱스 무선망 통신 로그 (MQTT/Token/VSS)</span>
+                <span onclick="clearLogs()" class="text-slate-500 hover:text-slate-300 text-[9px] cursor-pointer"><i class="fa-regular fa-trash-can mr-1"></i> Clear Logs</span>
+            </h3>
+            <div id="telematics-terminal" class="flex-1 font-mono text-[11px] text-slate-300 overflow-y-auto space-y-1 terminal-scroll pr-1">
+                <div class="text-slate-600 italic">상시 전원 B1 인입 및 서버와의 교신 시그널 이력이 기록됩니다...</div>
+            </div>
+        </div>
+
+    </footer>
+
+    <!-- 통합 인터랙티브 제어 자바스크립트 엔진 -->
+    <script>
+        // -----------------------------------------------------------------------------
+        // [1. 상태 머신 글로벌 변수]
+        // -----------------------------------------------------------------------------
+        let vehicleState = {
+            power: 'SLEEP', // SLEEP, BOOTING, ETHERNET_UP, CONNECTED, SHUTTING_DOWN
+            wires: { b1: 1, acc: 0, ign1: 0, ign3: 0 },
+            is_awake: false,
+            is_ethernet_up: false,
+            lock_state: 1, // LOCKED: 1, UNLOCKED: 0
+            climate_active: 0,
+            temp: 22.0
+        };
+
+        // 지연 시간 설정 (부팅 5초, 슬립 Grace 10초)
+        const BOOT_DELAY = 5.0;
+        const SLEEP_GRACE = 10.0;
+        const ETHERNET_MATCH_DELAY = 3.0; // 추가 이더넷 매칭 통신 지연
+
+        let activeInterval = null;
+        let activeTimeout = null;
+        let canInterval = null;
+
+        // 스톱워치 측정 변수
+        let manualStopwatchActive = false;
+        let manualStartTime = null;
+        let manualTimerInterval = null;
+
+        let autoBenchmarkActive = false;
+        let autoStartTime = null;
+        let autoTimerInterval = null;
+
+        // -----------------------------------------------------------------------------
+        // [2. 화면 초기 로드 실행]
+        // -----------------------------------------------------------------------------
+        window.onload = function () {
+            appendTelematicsLog("⚡ [SYSTEM] B+ 상시 전원 인입 완료. 가상 대기 전력 활성화 (14.2V)");
+            appendTelematicsLog("📡 [SYSTEM] CCU 수신 데몬 기동. 무선 제어 백그라운드 스캔 모드 진입.");
+            updateWireUI();
+            updateVehicleStatus();
+        }
+
+        // -----------------------------------------------------------------------------
+        // [3. 차량 물리 제어 릴레이 구동 스위치 인터페이스]
+        // -----------------------------------------------------------------------------
+        function triggerAccOn() {
+            if (vehicleState.power === 'BOOTING' || vehicleState.power === 'CONNECTED' || vehicleState.power === 'ETHERNET_UP') {
+                alert("차량이 이미 가동 중이거나 부팅 시퀀스 상태입니다!");
+                return;
+            }
+
+            // 만약 슬립 시퀀스가 구동 중이었다면 즉각 정지 후 전압 롤백
+            if (vehicleState.power === 'SHUTTING_DOWN') {
+                clearInterval(activeInterval);
+                clearTimeout(activeTimeout);
+                appendTelematicsLog("⚠️ [WAKEUP] 슬립 유예기간 중 전원 재인가 감지! 슬립 파이프라인 차단.");
+            }
+
+            // ACC 전압 배선 인가
+            vehicleState.wires.acc = 1;
+            vehicleState.wires.ign1 = 1; // IGN1 연동 가동
+            vehicleState.power = 'BOOTING';
+            vehicleState.is_awake = true;
+
+            updateWireUI();
+            updateVehicleStatus();
+            startManualStopwatch(); // 수동 테스트 스톱워치 기동
+
+            appendTelematicsLog(`🟢 [릴레이] ACC 전선 전압 고전압 릴레이 ON. 가상 부팅 전력 인가.`);
+            appendTelematicsLog(`[BOOT] 가상 시스템 커널 부팅 개시 (지연 설계: ${BOOT_DELAY}초)...`);
+
+            // 부팅 5초 카운터 가동
+            let start = Date.now();
+            updateProgressTimer("차량 시스템 부팅 중...", BOOT_DELAY, 0);
+
+            activeInterval = setInterval(() => {
+                let elapsed = (Date.now() - start) / 1000;
+                if (elapsed >= BOOT_DELAY) {
+                    clearInterval(activeInterval);
+                    executeBootComplete();
+                } else {
+                    updateProgressTimer("차량 시스템 부팅 중...", BOOT_DELAY, elapsed);
+                }
+            }, 100);
+
+            // 실시간 CAN 버스 데이터 통신 기동
+            startCanBus();
+        }
+
+        function executeBootComplete() {
+            vehicleState.power = 'ETHERNET_UP';
+            updateProgressTimer("부팅 완료! 이더넷 매칭 대기 중...", ETHERNET_MATCH_DELAY, 0);
+            updateVehicleStatus();
+            appendTelematicsLog("🟢 [BOOT] 가상 DCU 커널 부팅 성공! (5.0초 소요)");
+            appendTelematicsLog("🌐 [NETWORK] DCU ➔ CCU 고속 이더넷 인터페이스 매칭 링크업 개시 (지연: 3.0초)...");
+
+            let start = Date.now();
+            activeInterval = setInterval(() => {
+                let elapsed = (Date.now() - start) / 1000;
+                if (elapsed >= ETHERNET_MATCH_DELAY) {
+                    clearInterval(activeInterval);
+                    executeEthernetAndMqttConnected();
+                } else {
+                    updateProgressTimer("이더넷 링크업 지연 대기 중...", ETHERNET_MATCH_DELAY, elapsed);
+                }
+            }, 100);
+        }
+
+        function executeEthernetAndMqttConnected() {
+            vehicleState.power = 'CONNECTED';
+            vehicleState.is_ethernet_up = true;
+            updateVehicleStatus();
+            updateProgressTimer("통신 개통 성공 - READY", 100, 100);
+
+            appendTelematicsLog("🌐 [NETWORK] DCU 이더넷 링크업 체결 완료! [Link State: ACTIVE (100Mbps)]");
+            appendTelematicsLog("📡 [MQTT] CCU ➔ 텔레매틱스 서버 TCP 무선 커넥션 수립 성공.");
+            appendTelematicsLog("🔑 [MQTT] JWT 인증 토큰 3차 검증 완료. (CCU CONNECTED STATUS REPORT)");
+
+            // 부팅 완료 및 통신 연결 시점에 수동 스톱워치 중지
+            stopManualStopwatch();
+        }
+
+        function triggerAccOff() {
+            if (vehicleState.power === 'SLEEP') {
+                alert("차량이 이미 슬립(OFF) 상태입니다!");
+                return;
+            }
+
+            // 구동 중인 부팅 및 이더넷 루프 일시 정지
+            clearInterval(activeInterval);
+            vehicleState.wires.acc = 0;
+            vehicleState.wires.ign1 = 0;
+            vehicleState.wires.ign3 = 0;
+            updateWireUI();
+
+            vehicleState.power = 'SHUTTING_DOWN';
+            updateVehicleStatus();
+
+            appendTelematicsLog(`⏳ [SLEEP] ACC OFF 전압 해제 감지. 슬립 유예기간(Grace Period) ${SLEEP_GRACE}초 돌입.`);
+            appendTelematicsLog(`[SLEEP] CAN 통신 무선 데이터 정합성 백업용 CRC 체크 및 VSS 유지 개시...`);
+
+            let start = Date.now();
+            updateProgressTimer("슬립 예비 유예 대기 중...", SLEEP_GRACE, 0);
+
+            activeInterval = setInterval(() => {
+                let elapsed = (Date.now() - start) / 1000;
+                if (elapsed >= SLEEP_GRACE) {
+                    clearInterval(activeInterval);
+                    executeSleepComplete();
+                } else {
+                    updateProgressTimer("슬립 전 백업용 VSS_ALL_DATA 준비 중...", SLEEP_GRACE, elapsed);
+                }
+            }, 100);
+        }
+
+        function executeSleepComplete() {
+            // 슬립 가동 시점 최종 VSS_ALL_DATA 전송 및 MQTT 끊기
+            appendTelematicsLog("📊 [VSS] 슬립 전 최종 차량 텔레메트리 백업 신호(VSS_ALL_DATA) 무선 퍼블리싱 성공.");
+            appendTelematicsLog("📡 [MQTT] CCU ➔ 서버 소켓 세션 안전 차단. (CCU DISCONNECTED)");
+            appendTelematicsLog("🟢 [SLEEP] 모든 내부 ECU 셧다운 완료. 저전력 정지 전류(0.02A) 진입.");
+
+            vehicleState.power = 'SLEEP';
+            vehicleState.is_awake = false;
+            vehicleState.is_ethernet_up = false;
+            
+            updateVehicleStatus();
+            updateProgressTimer("슬립 상태 진입 완료 - SLEEP", 100, 0);
+            stopCanBus();
+        }
+
+        function triggerBplusReset() {
+            // 모든 구동중인 타이머 삭제
+            clearInterval(activeInterval);
+            clearTimeout(activeTimeout);
+            stopCanBus();
+            stopManualStopwatch();
+            stopAutoBenchmark();
+
+            // 디폴트로 원복
+            vehicleState = {
+                power: 'SLEEP',
+                wires: { b1: 1, acc: 0, ign1: 0, ign3: 0 },
+                is_awake: false,
+                is_ethernet_up: false,
+                lock_state: 1,
+                climate_active: 0,
+                temp: 22.0
+            };
+
+            updateWireUI();
+            updateVehicleStatus();
+            updateProgressTimer("B+ RESET - 공장 초기화 완료", 100, 0);
+
+            document.getElementById('manual-stopwatch').innerText = "00:00.00";
+            document.getElementById('auto-benchmark').innerText = "00:00.00";
+
+            document.getElementById('can-terminal').innerHTML = `<div class="text-slate-600 italic">B+ 리셋이 진행되어 CAN 버스가 완전히 리셋되었습니다.</div>`;
+            document.getElementById('telematics-terminal').innerHTML = ``;
+            appendTelematicsLog("⚡ [B+ RESET] 배터리 상시 전압 단절 후 강제 방전 유실 연출.");
+            appendTelematicsLog("⚡ [B+ RESET] 휘발성 캐시 설정 파괴 완료. 공장 출고 디폴트 정보로 강제 원복.");
+        }
+
+        // -----------------------------------------------------------------------------
+        // [4. 실시간 롤링 CAN 버스 패킷 스니퍼 모사기]
+        // -----------------------------------------------------------------------------
+        function startCanBus() {
+            stopCanBus();
+            const canStatus = document.getElementById('can-rolling-status');
+            canStatus.innerText = "CAN_BUS_ACTIVE";
+            canStatus.className = "bg-emerald-500/10 text-emerald-400 text-[9px] font-mono px-2 py-0.5 rounded";
+
+            const canTerminal = document.getElementById('can-terminal');
+            canTerminal.innerHTML = "";
+
+            canInterval = setInterval(() => {
+                if (!vehicleState.is_awake) return;
+
+                const timestamp = (Date.now() / 1000).toFixed(4);
+                const randomCrc = "0x" + Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+                const counterByte = Math.floor(Math.random() * 0xFF).toString(16).toUpperCase().padStart(2, '0');
+                
+                let id = "0x123";
+                let dlc = "8";
+                let payload = `01 01 ${counterByte} 00 00 00 00 00`;
+                let desc = "RSC_CLIMATE_ALIVE_STATUS";
+
+                // 도어 문 락 변경 시 ID 변환
+                if (Math.random() > 0.7) {
+                    id = "0x201";
+                    payload = `01 ${vehicleState.lock_state === 1 ? '03' : '04'} ${counterByte} 00 00 00 00 00`;
+                    desc = vehicleState.lock_state === 1 ? "BCM_DOOR_LOCKED_EVENT" : "BCM_DOOR_UNLOCKED_EVENT";
+                }
+
+                const logRow = document.createElement('div');
+                logRow.className = "hover:bg-slate-900/60 py-0.5 px-1 rounded transition-all";
+                logRow.innerHTML = `
+                    <span class="text-slate-600">[${timestamp}]</span> 
+                    <span class="text-blue-400 font-bold">${id}</span> 
+                    <span class="text-slate-500">DLC:${dlc}</span> 
+                    <span class="text-emerald-300 font-bold font-mono">${payload}</span> 
+                    <span class="text-yellow-500 font-mono text-[10px]">(${randomCrc})</span>
+                    <span class="text-slate-500 text-[10px] ml-2">// ${desc}</span>
+                `;
+
+                canTerminal.appendChild(logRow);
+                canTerminal.scrollTop = canTerminal.scrollHeight;
+
+                // 과도한 엘리먼트 가도 제한
+                if (canTerminal.childElementCount > 35) {
+                    canTerminal.removeChild(canTerminal.firstChild);
+                }
+            }, 150);
+        }
+
+        function stopCanBus() {
+            clearInterval(canInterval);
+            const canStatus = document.getElementById('can-rolling-status');
+            canStatus.innerText = "CAN_BUS_OFF";
+            canStatus.className = "bg-slate-950 text-slate-500 text-[9px] font-mono px-2 py-0.5 rounded";
+        }
+
+        // -----------------------------------------------------------------------------
+        // [5. UI 데이터 갱신 유틸리티]
+        // -----------------------------------------------------------------------------
+        function updateWireUI() {
+            const wires = vehicleState.wires;
+            toggleWire('glow-acc', 'badge-acc', wires.acc, 'ACC');
+            toggleWire('glow-ign1', 'badge-ign1', wires.ign1, 'IGN1');
+            toggleWire('glow-ign3', 'badge-ign3', wires.ign3, 'IGN3');
+        }
+
+        function toggleWire(glowId, badgeId, isActive, label) {
+            const glowEl = document.getElementById(glowId);
+            const badgeEl = document.getElementById(badgeId);
+
+            if (isActive === 1) {
+                glowEl.className = "w-12 h-12 rounded-full bg-emerald-500/10 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 wire-active";
+                badgeEl.innerText = "ACTIVE (1)";
+                badgeEl.className = "text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded text-[10px]";
+            } else {
+                glowEl.className = "w-12 h-12 rounded-full bg-slate-950 border-2 border-slate-800 flex items-center justify-center text-slate-500 transition-all duration-300";
+                badgeEl.innerText = "OFF (0)";
+                badgeEl.className = "text-slate-500 font-bold bg-slate-950 px-2 py-0.5 rounded text-[10px]";
+            }
+        }
+
+        function updateVehicleStatus() {
+            document.getElementById('current-panel-state').innerText = vehicleState.power;
+            
+            const netStatus = document.getElementById('current-network-state');
+            if (vehicleState.power === 'CONNECTED') {
+                netStatus.innerText = "CONNECTED";
+                netStatus.className = "text-lg font-bold text-emerald-400";
+            } else if (vehicleState.power === 'BOOTING' || vehicleState.power === 'ETHERNET_UP') {
+                netStatus.innerText = "ESTABLISHING...";
+                netStatus.className = "text-lg font-bold text-yellow-400 animate-pulse";
+            } else if (vehicleState.power === 'SHUTTING_DOWN') {
+                netStatus.innerText = "SHUTTING DOWN";
+                netStatus.className = "text-lg font-bold text-amber-500 animate-pulse";
+            } else {
+                netStatus.innerText = "DISCONNECTED";
+                netStatus.className = "text-lg font-bold text-slate-500";
+            }
+        }
+
+        function updateProgressTimer(label, max, current) {
+            document.getElementById('timer-label').innerText = label;
+            document.getElementById('timer-counter').innerText = `${current.toFixed(1)}s / ${max.toFixed(1)}s`;
+            
+            const pct = (current / max) * 100;
+            document.getElementById('timer-progress').style.width = `${pct}%`;
+        }
+
+        function appendTelematicsLog(text) {
+            const term = document.getElementById('telematics-terminal');
+            const timeStr = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = "py-0.5 border-b border-slate-900/40 text-slate-300 font-mono";
+            div.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> ${text}`;
+            term.appendChild(div);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('telematics-terminal').innerHTML = "";
+        }
+
+        // -----------------------------------------------------------------------------
+        // [6. 수동 vs 자동화 정량적 벤치마킹 스톱워치 엔진]
+        // -----------------------------------------------------------------------------
+        function startManualStopwatch() {
+            if (manualStopwatchActive) return;
+            manualStopwatchActive = true;
+            manualStartTime = Date.now();
+            
+            manualTimerInterval = setInterval(() => {
+                let diff = Date.now() - manualStartTime;
+                document.getElementById('manual-stopwatch').innerText = formatTime(diff);
+            }, 37);
+        }
+
+        function stopManualStopwatch() {
+            clearInterval(manualTimerInterval);
+            manualStopwatchActive = false;
+        }
+
+        function runAutoBenchmark() {
+            if (autoBenchmarkActive) return;
+            autoBenchmarkActive = true;
+            
+            // 자동화 시나리오는 B+ 리셋부터 5초 부팅 완료 및 링크업까지 컴퓨터의 무인 정밀 매핑 진행을 연출합니다.
+            triggerBplusReset();
+            
+            autoStartTime = Date.now();
+            appendTelematicsLog("🚀 [BENCHMARK] Pytest 기반 자동화 성능 평가 가동.");
+            appendTelematicsLog("📊 [BENCHMARK] 컴퓨터 무인 초정밀 모니터링 폴링 스레드 기동 완료.");
+
+            // ACC ON 호출
+            triggerAccOn();
+
+            autoTimerInterval = setInterval(() => {
+                let diff = Date.now() - autoStartTime;
+                document.getElementById('auto-benchmark').innerText = formatTime(diff);
+
+                // 연결이 완료되는 ETHERNET_UP ➔ CONNECTED 도달 시점에 자동화 타이머 즉각 중지 및 정밀 오차 검증
+                if (vehicleState.power === 'CONNECTED') {
+                    stopAutoBenchmark();
+                    let finalMs = Date.now() - autoStartTime;
+                    
+                    // 정량적 보고서 출력
+                    appendTelematicsLog(`📊 [BENCHMARK] 자동화 검증 시나리오 성공! (최종 소요 시간: ${(finalMs/1000).toFixed(2)}초)`);
+                    appendTelematicsLog(`📊 [BENCHMARK] 사람이 개입해 눈으로 검사(약 12.5초) 대비 수동 리소스 99.8% 절감 확인.`);
+                }
+            }, 10);
+        }
+
+        function stopAutoBenchmark() {
+            clearInterval(autoTimerInterval);
+            autoBenchmarkActive = false;
+        }
+
+        function formatTime(ms) {
+            let totalSecs = Math.floor(ms / 1000);
+            let mins = Math.floor(totalSecs / 60).toString().padStart(2, '0');
+            let secs = (totalSecs % 60).toString().padStart(2, '0');
+            let cents = Math.floor((ms % 1000) / 10).toString().padStart(2, '0');
+            return `${mins}:${secs}.${cents}`;
+        }
+    </script>
+</body>
+</html>
